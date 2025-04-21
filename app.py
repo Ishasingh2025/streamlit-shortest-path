@@ -2,23 +2,20 @@ import streamlit as st
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
+import io
 
-# Configure Streamlit page
-st.set_page_config(page_title="🚗 Road Trip Optimizer", layout="wide")
+# --- Page setup ---
+st.set_page_config(page_title="🚗 Advanced Road Trip Optimizer", layout="wide")
 
-# Sidebar content
+# --- Sidebar Settings ---
 with st.sidebar:
-    st.title("📍 Road Trip Optimizer")
-    st.markdown("This app calculates the **shortest path** between towns based on distance, cost, or time using **Dijkstra's Algorithm**.")
-    st.markdown("Built with ❤️ using Streamlit + NetworkX")
-    st.markdown("GitHub: [Add your link here](https://github.com/YOUR_USERNAME/streamlit-shortest-path)")
-    st.markdown("---")
+    st.title("⚙️ Settings")
+    metric = st.radio("📏 What do edge weights represent?", ['Miles (Distance)', 'Cost ($)', 'Time (minutes)'])
     layout_option = st.selectbox("🗺️ Choose Graph Layout", ["Spring", "Kamada-Kawai", "Circular", "Shell"])
+    node_size = st.slider("🔘 Node Size", 500, 2500, 1500, 100)
+    node_color = st.color_picker("🎨 Node Color", "#87CEEB")  # skyblue default
 
-# Radio button to select metric type
-metric = st.radio("🔢 What do the numbers represent?", ['Miles (Distance)', 'Cost ($)', 'Time (minutes)'])
-
-# Define the edge list from the diagram
+# --- Edge List ---
 edges = [
     ('Origin', 'A', 40),
     ('Origin', 'B', 60),
@@ -34,11 +31,19 @@ edges = [
     ('D', 'Destination', 80)
 ]
 
-# Create undirected graph (roads are 2-way)
+# --- Build Graph ---
 G = nx.Graph()
 G.add_weighted_edges_from(edges)
 
-# Choose layout
+# --- Node Selection ---
+all_nodes = sorted(G.nodes())
+col1, col2 = st.columns(2)
+with col1:
+    start_node = st.selectbox("🚦 Select Starting Node", all_nodes, index=0)
+with col2:
+    end_node = st.selectbox("🏁 Select Destination Node", all_nodes, index=len(all_nodes)-1)
+
+# --- Layout ---
 if layout_option == "Spring":
     pos = nx.spring_layout(G, seed=42)
 elif layout_option == "Kamada-Kawai":
@@ -48,40 +53,45 @@ elif layout_option == "Circular":
 else:
     pos = nx.shell_layout(G)
 
-# Compute shortest path and distance
-path = nx.dijkstra_path(G, 'Origin', 'Destination', weight='weight')
-length = nx.dijkstra_path_length(G, 'Origin', 'Destination', weight='weight')
+# --- Calculate Shortest Path ---
+try:
+    path = nx.dijkstra_path(G, start_node, end_node, weight='weight')
+    length = nx.dijkstra_path_length(G, start_node, end_node, weight='weight')
 
-# Show route
-st.subheader("🛣️ Shortest Route")
-st.success(" → ".join(f"🏙️ {node}" for node in path))
-st.metric(f"Total {metric}", f"{length}")
+    # --- Display Results ---
+    st.subheader("🧭 Optimal Route Found")
+    st.success(" → ".join(f"🏙️ {node}" for node in path))
+    st.metric(f"Total {metric}", f"{length}")
 
-# Plotting the graph
-st.subheader("🗺️ Route Map")
-fig, ax = plt.subplots(figsize=(8, 6))
-edge_labels = nx.get_edge_attributes(G, 'weight')
+    # --- Plot Graph ---
+    st.subheader("🗺️ Network Visualization")
+    fig, ax = plt.subplots(figsize=(8, 6))
+    edge_labels = nx.get_edge_attributes(G, 'weight')
 
-# Draw all nodes and edges
-nx.draw_networkx_nodes(G, pos, node_color='skyblue', node_size=1500, ax=ax)
-nx.draw_networkx_edges(G, pos, edgelist=G.edges(), edge_color='gray', ax=ax)
+    nx.draw_networkx_nodes(G, pos, node_color=node_color, node_size=node_size, ax=ax)
+    nx.draw_networkx_edges(G, pos, edgelist=G.edges(), edge_color='gray', ax=ax)
+    nx.draw_networkx_edges(G, pos, edgelist=list(zip(path, path[1:])), edge_color='red', width=2.5, ax=ax)
+    nx.draw_networkx_labels(G, pos, font_size=10, ax=ax)
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=9, ax=ax)
+    st.pyplot(fig)
 
-# Highlight shortest path in red
-path_edges = list(zip(path, path[1:]))
-nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='red', width=2.5, ax=ax)
+    # --- Step-by-step Table ---
+    st.subheader("📋 Route Breakdown")
+    route_data = []
+    for i in range(len(path) - 1):
+        src = path[i]
+        dest = path[i + 1]
+        weight = G[src][dest]['weight']
+        route_data.append({'From': src, 'To': dest, f'{metric}': weight})
+    df = pd.DataFrame(route_data)
+    st.dataframe(df, use_container_width=True)
 
-# Draw labels
-nx.draw_networkx_labels(G, pos, font_size=10, ax=ax)
-nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=9, ax=ax)
+    # --- Export Button ---
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    st.download_button("📁 Download Path as CSV", data=csv_buffer.getvalue(),
+                       file_name=f'shortest_path_{start_node}_to_{end_node}.csv',
+                       mime='text/csv')
 
-# Show the graph
-st.pyplot(fig)
-
-# Step-by-step breakdown
-st.subheader("📋 Step-by-Step Travel Details")
-route_data = []
-for i in range(len(path) - 1):
-    src = path[i]
-    dest = path[i + 1]
-    weight = G[src][dest]['weight']
-    route_data.append_
+except nx.NetworkXNoPath:
+    st.error(f"No path exists between **{start_node}** and **{end_node}**. Please select a connected pair.")
