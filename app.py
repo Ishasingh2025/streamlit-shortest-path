@@ -18,7 +18,7 @@ with st.sidebar:
 # Radio button to select metric type
 metric = st.radio("🔢 What do the numbers represent?", ['Miles (Distance)', 'Cost ($)', 'Time (minutes)'])
 
-# Define the edge list from the problem
+# Define the edge list from the diagram
 edges = [
     ('Origin', 'A', 40),
     ('Origin', 'B', 60),
@@ -34,11 +34,11 @@ edges = [
     ('D', 'Destination', 80)
 ]
 
-# Create undirected graph (since roads are bidirectional)
+# Create undirected graph (roads are 2-way)
 G = nx.Graph()
 G.add_weighted_edges_from(edges)
 
-# Select layout
+# Choose layout
 if layout_option == "Spring":
     pos = nx.spring_layout(G, seed=42)
 elif layout_option == "Kamada-Kawai":
@@ -48,7 +48,7 @@ elif layout_option == "Circular":
 else:
     pos = nx.shell_layout(G)
 
-# Compute shortest path
+# Compute shortest path and distance
 path = nx.dijkstra_path(G, 'Origin', 'Destination', weight='weight')
 length = nx.dijkstra_path_length(G, 'Origin', 'Destination', weight='weight')
 
@@ -62,17 +62,19 @@ st.subheader("🗺️ Route Map")
 fig, ax = plt.subplots(figsize=(8, 6))
 edge_labels = nx.get_edge_attributes(G, 'weight')
 
-# Draw all edges and nodes
+# Draw all nodes and edges
 nx.draw_networkx_nodes(G, pos, node_color='skyblue', node_size=1500, ax=ax)
 nx.draw_networkx_edges(G, pos, edgelist=G.edges(), edge_color='gray', ax=ax)
 
-# Highlight the path
+# Highlight shortest path in red
 path_edges = list(zip(path, path[1:]))
 nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='red', width=2.5, ax=ax)
 
 # Draw labels
 nx.draw_networkx_labels(G, pos, font_size=10, ax=ax)
 nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=9, ax=ax)
+
+# Show the graph
 st.pyplot(fig)
 
 # Step-by-step breakdown
@@ -82,11 +84,4 @@ for i in range(len(path) - 1):
     src = path[i]
     dest = path[i + 1]
     weight = G[src][dest]['weight']
-    route_data.append({'From': src, 'To': dest, f'{metric}': weight})
-
-df = pd.DataFrame(route_data)
-st.dataframe(df, use_container_width=True)
-
-# Footer
-st.markdown("----")
-st.caption("Need help deploying this or customizing it further? Just ask!")
+    route_data.append_
